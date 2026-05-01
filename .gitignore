@@ -1,0 +1,54 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging and build outputs
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+temp/
+
+# Audio, model, and ONNX artifacts generated locally
+*.wav
+*.mp3
+*.flac
+*.ogg
+onnx/
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+GigaAM/
