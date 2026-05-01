@@ -1,6 +1,6 @@
 # Real-time Russian Speech Recognition with GigaAM
 # 
-# PyTorch with MPS support for Apple Silicon
+# PyTorch. Install a CUDA-enabled build for automatic GPU inference on Windows.
 torch>=2.0.0
 torchaudio>=2.0.0
 

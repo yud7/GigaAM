@@ -8,7 +8,7 @@ text normalization support.
 
 === Prerequisites ===
 1. Python 3.10+
-2. Install ffmpeg (macOS): brew install ffmpeg
+2. Install ffmpeg and a CUDA-enabled PyTorch build if you want GPU inference on Windows
 3. Clone and install GigaAM:
    git clone https://github.com/salute-developers/GigaAM.git
    cd GigaAM
@@ -18,7 +18,7 @@ text normalization support.
 
 === Usage ===
 python realtime_gigaam.py
-python realtime_gigaam.py --device mps --block-duration 0.5
+python realtime_gigaam.py --device cuda --block-duration 0.5
 
 Press Ctrl+C to stop.
 
@@ -26,6 +26,7 @@ Press Ctrl+C to stop.
 - Uses a rolling audio buffer (last N seconds) for context
 - Periodically runs full-buffer transcription (pseudo-streaming)
 - Compares transcriptions to show only new/changed content
+- Uses CUDA automatically on Windows when a CUDA-enabled PyTorch build is available
 - Optimized for Apple Silicon with MPS (Metal) acceleration
 
 """
@@ -67,7 +68,7 @@ class Config:
     update_interval: float = 0.5       # Re-run transcription every N seconds of new audio
     
     # Device settings
-    device: str = "auto"               # "auto", "mps", "cpu"
+    device: str = "auto"               # "auto", "cuda", "gpu", "mps", "cpu"
     
     @property
     def block_size(self) -> int:
@@ -89,18 +90,46 @@ class Config:
 # DEVICE DETECTION
 # ============================================================================
 
+def print_cuda_diagnostics() -> None:
+    """Print enough CUDA state to explain why GPU was or was not selected."""
+    print(f"{Fore.CYAN}CUDA diagnostics:{Style.RESET_ALL}")
+    print(f"  torch: {torch.__version__}")
+    print(f"  torch.version.cuda: {torch.version.cuda}")
+    print(f"  torch.cuda.is_available(): {torch.cuda.is_available()}")
+    print(f"  torch.cuda.device_count(): {torch.cuda.device_count()}")
+    if torch.cuda.is_available():
+        print(f"  torch.cuda.get_device_name(0): {torch.cuda.get_device_name(0)}")
+
+
 def get_device(requested: str = "auto") -> torch.device:
     """
     Determine the best available device for inference.
     
     Args:
-        requested: "auto", "mps", or "cpu"
+        requested: "auto", "cuda", "gpu", "mps", or "cpu"
     
     Returns:
         torch.device for model and tensor placement
     """
+    requested = requested.lower()
+
     if requested == "cpu":
         return torch.device("cpu")
+
+    if requested in ("auto", "cuda", "gpu"):
+        if torch.cuda.is_available():
+            device_name = torch.cuda.get_device_name(0)
+            print(f"{Fore.GREEN}CUDA acceleration available: {device_name}{Style.RESET_ALL}")
+            return torch.device("cuda")
+        if requested in ("cuda", "gpu"):
+            print(f"{Fore.RED}CUDA was requested, but PyTorch cannot use CUDA in this environment.{Style.RESET_ALL}")
+            print_cuda_diagnostics()
+            print(
+                f"{Fore.YELLOW}Install a CUDA-enabled torch build in the venv, then run again.{Style.RESET_ALL}"
+            )
+            sys.exit(1)
+        print(f"{Fore.YELLOW}CUDA is not available to PyTorch; checking other accelerators.{Style.RESET_ALL}")
+        print_cuda_diagnostics()
     
     if requested in ("auto", "mps"):
         if torch.backends.mps.is_available():
@@ -148,7 +177,7 @@ def load_gigaam_model(device: torch.device):
     
     try:
         # load_model handles device placement and fp16 conversion automatically
-        # fp16_encoder=True for faster inference on GPU/MPS (default)
+        # fp16_encoder=True for faster inference on CUDA GPU (default)
         # For MPS, we disable fp16 as it can cause issues on some systems
         fp16 = device.type != "mps"
         model = gigaam.load_model("v3_e2e_rnnt", device=device, fp16_encoder=fp16)
@@ -373,6 +402,7 @@ def run_realtime_transcription(config: Config) -> None:
     """
     # Determine device
     device = get_device(config.device)
+    print(f"{Fore.CYAN}Resolved inference device: {device}{Style.RESET_ALL}")
     
     # Load model
     model = load_gigaam_model(device)
@@ -458,6 +488,7 @@ def run_realtime_transcription(config: Config) -> None:
 #         epilog="""
 # Examples:
 #   python realtime_gigaam.py
+#   python realtime_gigaam.py --device cuda
 #   python realtime_gigaam.py --device mps
 #   python realtime_gigaam.py --block-duration 0.3 --update-interval 0.5
 #         """
@@ -466,9 +497,9 @@ def run_realtime_transcription(config: Config) -> None:
 #     parser.add_argument(
 #         "--device",
 #         type=str,
-#         choices=["auto", "mps", "cpu"],
+#         choices=["auto", "cuda", "mps", "cpu"],
 #         default="auto",
-#         help="Compute device: auto (default), mps (Metal), or cpu"
+#         help="Compute device: auto (default), cuda, mps (Metal), or cpu"
 #     )
     
 #     parser.add_argument(
@@ -506,7 +537,7 @@ def parse_args() -> Config:
     base = Config()  # <-- берём дефолты из dataclass
 
     parser = argparse.ArgumentParser(...)
-    parser.add_argument("--device", choices=["auto","mps","cpu"], default=base.device)
+    parser.add_argument("--device", choices=["auto","cuda","gpu","mps","cpu"], default=base.device)
     parser.add_argument("--block-duration", type=float, default=base.block_duration)
     parser.add_argument("--max-buffer-duration", type=float, default=base.max_buffer_duration)
     parser.add_argument("--update-interval", type=float, default=base.update_interval)

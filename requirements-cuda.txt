@@ -1,0 +1,14 @@
+# CUDA-enabled PyTorch for Windows/NVIDIA.
+# Install with:
+#   python -m pip install --force-reinstall -r requirements-cuda.txt
+#
+# If pip reports "No matching distribution", check that Python is supported by
+# the selected PyTorch wheel and pick the CUDA index from:
+#   https://pytorch.org/get-started/locally/
+
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch==2.8.0+cu128
+torchaudio==2.8.0+cu128
+
+-r requirements.txt
